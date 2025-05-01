@@ -1,3 +1,4 @@
+use anstyle::Style;
 use serde::Serialize;
 use serde::ser;
 
@@ -7,6 +8,7 @@ use crate::error::Result;
 pub struct Serializer {
     // This string starts empty and JSON is appended as values are serialized.
     output: String,
+    depth: isize,
 }
 
 // By convention, the public API of a Serde serializer is one or more `to_abc`
@@ -20,6 +22,7 @@ where
 {
     let mut serializer = Serializer {
         output: String::new(),
+        depth: -1,
     };
     value.serialize(&mut serializer)?;
     Ok(serializer.output)
@@ -116,9 +119,7 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     // get the idea. For example it would emit invalid JSON if the input string
     // contains a '"' character.
     fn serialize_str(self, v: &str) -> Result<()> {
-        self.output += "\"";
         self.output += v;
-        self.output += "\"";
         Ok(())
     }
 
@@ -154,7 +155,8 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     // In Serde, unit means an anonymous value containing no data. Map this to
     // JSON as `null`.
     fn serialize_unit(self) -> Result<()> {
-        self.output += "null";
+        let style = Style::new().dimmed();
+        self.output += &format!("{style}null{style:#}");
         Ok(())
     }
 
@@ -202,11 +204,9 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     where
         T: ?Sized + Serialize,
     {
-        self.output += "{";
         variant.serialize(&mut *self)?;
         self.output += ":";
         value.serialize(&mut *self)?;
-        self.output += "}";
         Ok(())
     }
 
@@ -259,7 +259,6 @@ impl<'a> ser::Serializer for &'a mut Serializer {
 
     // Maps are represented in JSON as `{ K: V, K: V, ... }`.
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap> {
-        self.output += "{";
         Ok(self)
     }
 
@@ -269,6 +268,7 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     // Deserialize implementation is required to know what the keys are without
     // looking at the serialized data.
     fn serialize_struct(self, _name: &'static str, len: usize) -> Result<Self::SerializeStruct> {
+        self.depth += 1;
         self.serialize_map(Some(len))
     }
 
@@ -414,10 +414,14 @@ impl<'a> ser::SerializeMap for &'a mut Serializer {
     where
         T: ?Sized + Serialize,
     {
-        if !self.output.ends_with('{') {
-            self.output += ",";
-        }
-        key.serialize(&mut **self)
+        let style = match self.depth {
+            0 => Style::new().bold().underline(),
+            _ => Style::new().bold(),
+        };
+        self.output += &style.render().to_string();
+        key.serialize(&mut **self)?;
+        self.output += &style.render_reset().to_string();
+        Ok(())
     }
 
     // It doesn't make a difference whether the colon is printed at the end of
@@ -432,7 +436,10 @@ impl<'a> ser::SerializeMap for &'a mut Serializer {
     }
 
     fn end(self) -> Result<()> {
-        self.output += "}";
+        self.depth -= 1;
+        if self.depth == -1 {
+            self.output += "\n";
+        }
         Ok(())
     }
 }
@@ -447,16 +454,33 @@ impl<'a> ser::SerializeStruct for &'a mut Serializer {
     where
         T: ?Sized + Serialize,
     {
-        if !self.output.ends_with('{') {
-            self.output += ",";
-        }
-        key.serialize(&mut **self)?;
-        self.output += ":";
-        value.serialize(&mut **self)
+        if self.depth == 0 {
+            let style = Style::new().bold().underline();
+            self.output += &style.render().to_string();
+            key.serialize(&mut **self)?;
+            self.output += ":";
+            self.output += &style.render_reset().to_string();
+            self.output += "\n";
+        } else {
+            let style = Style::new().bold();
+            self.output += &style.render().to_string();
+            key.serialize(&mut **self)?;
+            self.output += ":";
+            self.output += &style.render_reset().to_string();
+            self.output += " ";
+        };
+
+        value.serialize(&mut **self)?;
+        self.output += "\n";
+        Ok(())
     }
 
     fn end(self) -> Result<()> {
-        self.output += "}";
+        self.depth -= 1;
+        dbg!(self.depth);
+        if self.depth < 1 {
+            self.output += "\n";
+        }
         Ok(())
     }
 }
