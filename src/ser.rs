@@ -156,7 +156,7 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     // JSON as `null`.
     fn serialize_unit(self) -> Result<()> {
         let style = Style::new().dimmed();
-        self.output += &format!("{style}null{style:#}");
+        self.output += &format!("{style}none{style:#}");
         Ok(())
     }
 
