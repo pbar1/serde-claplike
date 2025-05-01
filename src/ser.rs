@@ -25,7 +25,7 @@ where
         depth: -1,
     };
     value.serialize(&mut serializer)?;
-    Ok(serializer.output)
+    Ok(serializer.output.trim().to_owned())
 }
 
 impl<'a> ser::Serializer for &'a mut Serializer {
@@ -414,13 +414,13 @@ impl<'a> ser::SerializeMap for &'a mut Serializer {
     where
         T: ?Sized + Serialize,
     {
-        let style = match self.depth {
-            0 => Style::new().bold().underline(),
-            _ => Style::new().bold(),
-        };
-        self.output += &style.render().to_string();
-        key.serialize(&mut **self)?;
-        self.output += &style.render_reset().to_string();
+        // let style = match self.depth {
+        //     0 => Style::new().bold().underline(),
+        //     _ => Style::new().bold(),
+        // };
+        // self.output += &style.render().to_string();
+        // key.serialize(&mut **self)?;
+        // self.output += &style.render_reset().to_string();
         Ok(())
     }
 
@@ -437,9 +437,6 @@ impl<'a> ser::SerializeMap for &'a mut Serializer {
 
     fn end(self) -> Result<()> {
         self.depth -= 1;
-        if self.depth == -1 {
-            self.output += "\n";
-        }
         Ok(())
     }
 }
@@ -472,15 +469,14 @@ impl<'a> ser::SerializeStruct for &'a mut Serializer {
 
         value.serialize(&mut **self)?;
         self.output += "\n";
+        if self.depth == 0 {
+            self.output += "\n";
+        }
         Ok(())
     }
 
     fn end(self) -> Result<()> {
         self.depth -= 1;
-        dbg!(self.depth);
-        if self.depth < 1 {
-            self.output += "\n";
-        }
         Ok(())
     }
 }

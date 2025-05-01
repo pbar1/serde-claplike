@@ -1,24 +1,37 @@
+use std::collections::HashMap;
+
 use anstream::println;
 use serde::Serialize;
 use serde_claplike::to_string;
 
 #[derive(Default, Serialize)]
+#[serde(rename_all = "PascalCase")]
 struct MyType {
-    my_unit: (),
-    my_bool: bool,
-    my_int: isize,
-    my_uint: usize,
-    my_string: String,
-    my_option: Option<String>,
-    my_struct: MyStruct,
+    unit: (),
+    r#struct: MyStruct,
 }
 
 #[derive(Default, Serialize)]
+#[serde(rename_all = "PascalCase")]
 struct MyStruct {
-    foo: String,
+    string: String,
+    option: Option<String>,
+    num: usize,
+    vec: Vec<&'static str>,
+    map: HashMap<&'static str, &'static str>,
 }
 
 fn main() {
-    let out = to_string(&MyType::default()).unwrap();
+    let value = MyType {
+        unit: (),
+        r#struct: MyStruct {
+            string: "Hello".into(),
+            option: None,
+            num: 1337,
+            vec: vec!["elliot", "fsociety"],
+            map: HashMap::from_iter([("a", "AAAA")]),
+        },
+    };
+    let out = to_string(&value).unwrap();
     println!("{out}");
 }
